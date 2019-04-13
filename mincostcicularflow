@@ -1,0 +1,243 @@
+function [F,c1,K,u1,vex,path,MinCost]=mincostcicularflow(G,u,I,c)
+%输出：最小成本循环流问题的最小成本MinCost
+%      以及达到最小成本的流值FlowMatrix
+%输入： G n*n维矩阵，记录节点和边
+%      c 每条边上流值上限
+%      I 每条边上流值下限
+%      u 每条边上成本
+
+m=length(G);
+vex=zeros(1,m);
+F=zeros(size(G));
+K=zeros(size(G));
+M=zeros(size(G));
+c1=zeros(size(G));
+u1=zeros(size(G));
+MinCost=0;
+d=[];
+A=[];
+path=[];
+b=1;
+
+for i=1:m
+    for j=1:m
+        if G(i,j)~=0;
+            if u(i,j)>(vex(j)-vex(i))
+                K(i,j)=abs(F(i,j)-I(i,j));
+            elseif u(i,j)<(vex(j)-vex(i))
+                K(i,j)=abs(F(i,j)-c(i,j));
+            elseif (u(i,j)==vex(j)-vex(i))&&(F(i,j)<I(i,j))
+                K(i,j)=I(i,j)-F(i,j);
+            elseif (u(i,j)==vex(j)-vex(i))&&(F(i,j)>c(i,j))
+                K(i,j)=F(i,j)-c(i,j);
+            else
+                K(i,j)=0;
+            end
+        end
+    end
+end
+
+while b<2
+%构造冗余网络
+for i=1:m
+    for j=1:m
+        if G(i,j)~=0;
+            if (I(i,j)<=F(i,j))&&(F(i,j)<=c(i,j))
+                if F(i,j)<c(i,j)
+                    M(i,j)=1;
+                    c1(i,j)=c(i,j)-F(i,j);
+                    u1(i,j)=u(i,j);
+                end
+                if I(i,j)<F(i,j)
+                    M(j,i)=1;
+                    c1(j,i)=F(i,j)-I(i,j);
+                    u1(j,i)=-u(i,j);
+                end
+            end
+            if F(i,j)>c(i,j)
+                M(j,i)=1;
+                c1(j,i)=F(i,j)-c(i,j);
+                u1(j,i)=-u(i,j);
+            end
+            if F(i,j)<I(i,j)
+                M(i,j)=1;
+                c1(i,j)=I(i,j)-F(i,j);
+                u1(i,j)=u(i,j);
+            end
+        end
+    end
+end
+
+
+    
+    for i=1:m
+        for j=1:m
+            if M(i,j)==1
+                if u1(i,j)>(vex(j)-vex(i))
+                    K(i,j)=abs(F(i,j)-I(i,j));
+                elseif u1(i,j)<(vex(j)-vex(i))
+                    K(i,j)=abs(F(i,j)-c(i,j));
+                elseif (u1(i,j)==(vex(j)-vex(i)))&&(F(i,j)<I(i,j))
+                    K(i,j)=I(i,j)-F(i,j);
+                elseif (u1(i,j)==vex(j)-vex(i))&&(F(i,j)>c(i,j))
+                    K(i,j)=F(i,j)-c(i,j);
+                else
+                    K(i,j)=0;
+                end
+            end
+        end
+    end
+    
+    for i=1:m
+        for j=1:m
+            if K(i,j)>0  
+                break;
+            end
+        end
+        break;
+    end
+    if i==m&&j==m 
+        break;%结束循环，F即为所求;
+    end
+   
+    p=i;q=j;
+    for i=1:m
+        for j=1:m
+            if M(i,j)~=0
+                A(i,j)=u1(i,j);
+            elseif i==j
+                A(i,j)=0;
+            else
+                A(i,j)=inf;
+            end
+        end
+    end
+    for i=1:m
+        d(i)=shortestpath(A,q,i);    %最短路问题P
+        vex(i)=vex(i)-d(i);
+    end
+  
+    for i=1:m
+        for j=1:m
+            if M(i,j)==1
+                if (p~=i)||(q~=j)
+                    u2=u1(i,j)+vex(j)-vex(i);
+                    u1(i,j)=max([0 u2]);
+                end
+            end
+        end
+    end
+
+        if u1(p,q)>(vex(q)-vex(p))
+            K(p,q)=abs(F(p,q)-I(p,q));
+        elseif u1(p,q)<(vex(q)-vex(p))
+            K(p,q)=abs(F(p,q)-c(p,q));
+        elseif (u1(p,q)==(vex(q)-vex(p)))&&(F(p,q)<I(p,q))
+            K(p,q)=I(p,q)-F(p,q);
+        elseif (u1(p,q)==(vex(q)-vex(p)))&&(F(p,q)>c(p,q))
+            K(p,q)=F(p,q)-c(p,q);
+        else
+            K(p,q)=0;
+        end
+        
+    [di,path]=shortestpath(A,q,p);
+    n=length(path);
+    if K(p,q)~=0
+        r=c1(p,q);
+        for i=1:m
+            for j=1:m
+                for k=1:n-1
+                    if i==path(k)&&j==path(k+1)&&(c1(i,j)<r)
+                        r=c1(i,j);
+                    end
+                end
+            end
+        end
+        F(p,q)=F(p,q)+r;
+        for i=1:m
+            for j=1:m  
+                for k=1:n-1
+                    if i==path(k)&&j==path(k+1)
+                        F(i,j)=F(i,j)+r;
+                    end
+                end
+            end
+        end
+    end
+    b=b+1;
+end
+for i=1:m
+    for j=1:m
+        MinCost=MinCost+F(i,j)*u(i,j);
+    end
+end
+end
+
+
+function [dist,path]=shortestpath(A,s,t)
+
+%A 
+%s 起点
+%t 终点
+n=size(A,1);
+D=A(s,:);
+path=[];
+visit=ones(1,n);
+visit(s)=0;
+parent=zeros(1,n);
+for i=1:n-1
+    temp=zeros(1,n);
+    count=0;
+    for j=1:n
+        if visit(j)
+            temp=[temp(1:count) D(j)];
+        else
+            temp=[temp(1:count) inf];
+        end
+        count=count+1;
+    end
+    [value,index]=min(temp);
+    j=index;
+    visit(j)=0;
+    for k=1:n
+        if D(k)>D(j)+A(j,k)
+            D(k)=D(j)+A(j,k);
+            parent(k)=j;
+        end
+    end
+end
+dist=D(t);
+if parent(t)==0
+    return;
+end
+path=zeros(1,2*n);
+e=t;
+path(1)=e;
+count=1;
+while e~=s&&e>0
+    pa=parent(e);
+    path=[pa path(1:count)];
+    e=pa;
+    count=count+1;
+end
+path(1)=s;
+path=path(1:count);
+end
+
+    
+            
+
+
+
+
+
+
+            
+               
+            
+            
+           
+        
+        
+        
+        
